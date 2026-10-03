@@ -4,7 +4,8 @@ A mobile app (iOS + Android, built with Expo / React Native) that you can talk t
 
 ## What it does
 
-- **Conversations.** Chat with Jarvis about anything. It's powered by Claude (`claude-opus-5-5`), with a composed, dry-witted Jarvis personality. Turn on **voice** in Settings and replies are read aloud in a British voice. Use your keyboard's mic button to talk instead of typing.
+- **Conversations.** Chat with Jarvis about anything. It's powered by Claude (`claude-opus-5-5`), with a composed, dry-witted Jarvis personality. Turn on **voice** in Settings and typed replies are read aloud in a British voice.
+- **Hands-free voice.** Tap 🎙 in the chat (it shows when the text box is empty) and just talk. Jarvis listens, replies out loud, then listens again, so you can hold a whole conversation with the phone in your pocket. Say "that's all" or "goodbye" (or tap **End**) to finish. It switches itself off after a few silent listens, and whenever the app goes to the background. In voice mode Jarvis keeps its replies short and spoken-style.
 - **Accountability.** Jarvis sees your goals, streaks and overdue tasks on every message, and acts on them:
   - Say "I'm going to start running every morning" and it offers to track it, or just adds it.
   - Say "did my run" and it logs it and updates your streak.
@@ -24,8 +25,8 @@ Then scan the QR code with a development build on your phone (see the note below
 
 On first launch, open **Settings** and paste an Anthropic API key from [console.anthropic.com](https://console.anthropic.com). It's stored in the device's secure keychain (`expo-secure-store`).
 
-> **Development build:** the app uses native modules (notifications, secure store, speech). Most work in Expo Go, but scheduled notifications need a development build:
-> `npx expo run:android` / `npx expo run:ios`, or `npx eas-cli@latest build --profile development`.
+> **Development build:** the app uses native modules (notifications, secure store, speech). Hands-free voice (`expo-speech-recognition`) and scheduled notifications need a development build. The rest of the app still runs in Expo Go, where the mic button explains that it's unavailable.
+> Build one with `npx expo run:android` / `npx expo run:ios`, or `npx eas-cli@latest build --profile development`.
 
 ### Checks
 
@@ -38,6 +39,8 @@ npm run lint
 
 ```
 src/
+  components/
+    VoicePanel.tsx      Pulsing orb + live transcript during hands-free mode
   app/                  Expo Router screens
     _layout.tsx         Root: providers + stack
     (tabs)/index.tsx    Jarvis chat (quick actions, notification → check-in)
@@ -46,6 +49,7 @@ src/
   lib/
     jarvis.ts           The brain: system prompt, tools, Claude tool-use loop
     store.tsx           App state (React context), persisted to AsyncStorage
+    voice.ts            Hands-free loop: listen → send → speak → listen again
     notifications.ts    Daily morning/evening check-in scheduling
     dates.ts            Streaks and date helpers
     storage.ts          AsyncStorage + SecureStore
@@ -65,7 +69,8 @@ This app calls the Anthropic API **directly from the phone using your own key**,
 
 ## Ideas for next steps
 
-- Hands-free voice input (e.g. `expo-speech-recognition`, which needs a dev build)
+- An always-on "Hey Jarvis" wake word (needs a background audio service and a wake-word engine such as Picovoice Porcupine)
+- A more natural voice using a neural text-to-speech API
 - Streaming replies (needs a fetch polyfill with streaming support on React Native)
 - A backend proxy plus accounts, so you can sync across devices
 - Weekly review summaries and charts

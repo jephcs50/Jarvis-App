@@ -131,7 +131,7 @@ export default function SettingsScreen() {
 
       <Section title="Voice">
         <View style={styles.row}>
-          <Text style={styles.label}>Read replies aloud</Text>
+          <Text style={styles.label}>Read typed replies aloud</Text>
           <Switch
             value={settings.voiceEnabled}
             onValueChange={(v) => {
@@ -142,7 +142,10 @@ export default function SettingsScreen() {
             trackColor={{ true: colors.accent, false: colors.border }}
           />
         </View>
-        <Text style={styles.help}>Tip: use your keyboard’s microphone button to talk to Jarvis.</Text>
+        <Text style={styles.help}>
+          Typed messages are read aloud when this is on. For a fully hands-free conversation, tap the 🎙 button in the chat:
+          Jarvis listens, replies out loud, then listens again. Say “that’s all” or tap End to finish.
+        </Text>
       </Section>
 
       <Section title="Daily check-ins">

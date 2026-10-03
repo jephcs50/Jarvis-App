@@ -118,7 +118,7 @@ function describeGoal(g: Goal): string {
   return `- ${parts.join(" · ")}`;
 }
 
-function buildContext(state: AppState): string {
+function buildContext(state: AppState, voice: boolean): string {
   const now = new Date();
   const active = state.goals.filter((g) => !g.archived);
   const lines = [
@@ -126,6 +126,11 @@ function buildContext(state: AppState): string {
     `Now: ${now.toLocaleString()} (today is ${dateKey(now)}, ${now.toLocaleDateString(undefined, { weekday: "long" })})`,
     state.settings.userName ? `User's name: ${state.settings.userName}` : "User's name: unknown",
     TONE_NOTES[state.settings.tone],
+    ...(voice
+      ? [
+          "Mode: hands-free voice. The user is speaking (transcribed, may contain recognition errors) and your reply will be spoken aloud. Keep it brief and conversational — no lists, symbols or formatting. End with a question only when you genuinely want an answer; the user can say \"that's all\" to end.",
+        ]
+      : []),
     "Goals:",
     ...(active.length ? active.map(describeGoal) : ["- (none yet)"]),
     "Memories:",
@@ -194,6 +199,7 @@ export async function runJarvisTurn(
   state: AppState,
   userText: string,
   apiKey: string | null,
+  options: { voice: boolean } = { voice: false },
 ): Promise<TurnResult> {
   if (!apiKey) throw new MissingApiKeyError("Add your Anthropic API key in Settings first.");
 
@@ -208,7 +214,7 @@ export async function runJarvisTurn(
     {
       role: "user",
       content: [
-        { type: "text", text: buildContext({ ...state, goals, memories }) },
+        { type: "text", text: buildContext({ ...state, goals, memories }, options.voice) },
         { type: "text", text: userText },
       ],
     },

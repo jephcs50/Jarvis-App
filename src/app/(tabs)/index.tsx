@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import { PRESET_PROMPTS } from "../../lib/jarvis";
 import { useStore } from "../../lib/store";
+import { useHandsFree } from "../../lib/voice";
+import { VoicePanel } from "../../components/VoicePanel";
 import { colors, radius } from "../../lib/theme";
 import type { ChatMessage } from "../../lib/types";
 
@@ -43,6 +45,17 @@ export default function ChatScreen() {
   const { state, loaded, thinking, hasApiKey, send, newConversation } = useStore();
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  const voice = useHandsFree((text) => send(text, { voice: true }));
+  const handsFree = voice.status !== "off";
+
+  const startHandsFree = () => {
+    if (!hasApiKey) {
+      router.navigate("/settings");
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    voice.start();
+  };
 
   // Tapping a morning/evening reminder opens the app straight into that check-in.
   const response = useLastNotificationResponse();
@@ -102,6 +115,16 @@ export default function ChatScreen() {
         }
       />
 
+      {voice.notice && (
+        <Pressable style={styles.notice} onPress={voice.dismissNotice}>
+          <Text style={styles.noticeText}>{voice.notice}</Text>
+        </Pressable>
+      )}
+
+      {handsFree ? (
+        <VoicePanel status={voice.status} transcript={voice.partial} onEnd={voice.stop} />
+      ) : (
+        <>
       <View style={styles.quickRow}>
         <FlatList
           horizontal
@@ -146,14 +169,27 @@ export default function ChatScreen() {
           multiline
           onSubmitEditing={() => submit(draft)}
         />
-        <Pressable
-          style={[styles.send, (!draft.trim() || thinking) && { opacity: 0.4 }]}
-          onPress={() => submit(draft)}
-          disabled={!draft.trim() || thinking}
-        >
-          <Text style={styles.sendText}>↑</Text>
-        </Pressable>
+        {draft.trim() ? (
+          <Pressable
+            style={[styles.send, thinking && { opacity: 0.4 }]}
+            onPress={() => submit(draft)}
+            disabled={thinking}
+          >
+            <Text style={styles.sendText}>↑</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={[styles.send, thinking && { opacity: 0.4 }]}
+            onPress={startHandsFree}
+            disabled={thinking}
+            accessibilityLabel="Start hands-free voice conversation"
+          >
+            <Text style={styles.micText}>🎙</Text>
+          </Pressable>
+        )}
       </View>
+        </>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -233,4 +269,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sendText: { color: colors.bg, fontSize: 22, fontWeight: "700" },
+  micText: { fontSize: 20 },
+  notice: { backgroundColor: colors.surfaceRaised, paddingVertical: 8, paddingHorizontal: 14 },
+  noticeText: { color: colors.gold, fontSize: 13, textAlign: "center" },
 });

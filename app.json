@@ -31,6 +31,16 @@
         {
           "color": "#38D6FF"
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Jarvis listens when you start a hands-free conversation.",
+          "speechRecognitionPermission": "Jarvis turns what you say into text so it can reply.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
       ]
     ],
     "scheme": "jarvis",

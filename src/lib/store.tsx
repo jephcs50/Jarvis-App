@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { dateKey, newId } from "./dates";
 import { describeError, runJarvisTurn } from "./jarvis";
 import { scheduleCheckIns } from "./notifications";
+import { JARVIS_VOICE } from "./voice";
 import { getApiKey, loadState, saveState, setApiKey as persistApiKey } from "./storage";
 import { EMPTY_STATE, type AppState, type ChatMessage, type Goal, type GoalKind, type Settings } from "./types";
 
@@ -11,7 +12,8 @@ interface Store {
   loaded: boolean;
   thinking: boolean;
   hasApiKey: boolean;
-  send: (text: string) => Promise<void>;
+  /** Sends a message to Jarvis and resolves with the reply, or null if nothing was sent or it failed. */
+  send: (text: string, options?: SendOptions) => Promise<string | null>;
   addGoal: (title: string, kind: GoalKind, why: string | null, dueDate: string | null) => void;
   toggleToday: (goalId: string) => void;
   archiveGoal: (goalId: string) => void;
@@ -19,6 +21,11 @@ interface Store {
   saveApiKey: (key: string) => Promise<void>;
   forgetMemory: (index: number) => void;
   newConversation: () => void;
+}
+
+export interface SendOptions {
+  /** Hands-free voice turn: Jarvis keeps it short, and the caller handles speaking the reply. */
+  voice?: boolean;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -52,13 +59,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, options: SendOptions = {}) => {
       const trimmed = text.trim();
-      if (!trimmed || thinking) return;
+      if (!trimmed || thinking) return null;
       update((s) => ({ ...s, chat: [...s.chat, message("user", trimmed)] }));
       setThinking(true);
       try {
-        const result = await runJarvisTurn(stateRef.current, trimmed, await getApiKey());
+        const result = await runJarvisTurn(stateRef.current, trimmed, await getApiKey(), {
+          voice: options.voice ?? false,
+        });
         update((s) => ({
           ...s,
           goals: result.goals,
@@ -70,12 +79,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             message("jarvis", result.reply),
           ],
         }));
-        if (stateRef.current.settings.voiceEnabled) {
+        if (stateRef.current.settings.voiceEnabled && !options.voice) {
           Speech.stop();
-          Speech.speak(result.reply, { language: "en-GB", rate: 1.0 });
+          Speech.speak(result.reply, JARVIS_VOICE);
         }
+        return result.reply;
       } catch (error) {
         update((s) => ({ ...s, chat: [...s.chat, message("event", describeError(error))] }));
+        return null;
       } finally {
         setThinking(false);
       }
