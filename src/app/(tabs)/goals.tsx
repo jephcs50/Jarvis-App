@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { isDoneToday, isOverdue, lastSevenDays, streak } from "../../lib/dates";
+import { isDoneToday, isOverdue, lastSevenDays, streak, weekProgress, weekSummary } from "../../lib/dates";
 import { useStore } from "../../lib/store";
 import { colors, radius } from "../../lib/theme";
 import type { Goal, GoalKind } from "../../lib/types";
@@ -38,6 +38,9 @@ function GoalCard({ goal }: { goal: Goal }) {
                 <View key={i} style={[styles.dot, d && styles.dotOn]} />
               ))}
             </View>
+            <Text style={styles.weekCount}>
+              {weekProgress(goal).done}/{weekProgress(goal).possible} this week
+            </Text>
             <Text style={styles.streak}>🔥 {streak(goal)}</Text>
           </View>
         ) : (
@@ -114,22 +117,30 @@ function AddGoal({ onDone }: { onDone: () => void }) {
   );
 }
 
+function StatTile({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.tile} accessible accessibilityLabel={`${value} ${label}`}>
+      <Text style={styles.tileValue}>{value}</Text>
+      <Text style={styles.tileLabel}>{label}</Text>
+    </View>
+  );
+}
+
 export default function GoalsScreen() {
   const { state } = useStore();
   const [adding, setAdding] = useState(false);
   const active = state.goals.filter((g) => !g.archived);
   const habits = active.filter((g) => g.kind === "habit");
   const tasks = active.filter((g) => g.kind === "task");
-  const doneToday = habits.filter(isDoneToday).length;
+  const summary = weekSummary(state.goals);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
       {habits.length > 0 && (
-        <View style={styles.summary}>
-          <Text style={styles.summaryBig}>
-            {doneToday}/{habits.length}
-          </Text>
-          <Text style={styles.summaryLabel}>habits done today</Text>
+        <View style={styles.tiles}>
+          <StatTile value={`${summary.habitsDoneToday}/${summary.habitCount}`} label="done today" />
+          <StatTile value={summary.weekRate === null ? "–" : `${summary.weekRate}%`} label="this week" />
+          <StatTile value={`${summary.bestStreak}`} label={summary.bestStreak === 1 ? "day best streak" : "days best streak"} />
         </View>
       )}
 
@@ -163,16 +174,20 @@ export default function GoalsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  summary: {
+  tiles: { flexDirection: "row", gap: 10 },
+  tile: {
+    flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderColor: colors.border,
     borderWidth: 1,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: "center",
   },
-  summaryBig: { color: colors.accent, fontSize: 40, fontWeight: "700" },
-  summaryLabel: { color: colors.textMuted },
+  tileValue: { color: colors.text, fontSize: 28, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  tileLabel: { color: colors.textMuted, fontSize: 12, marginTop: 2, textAlign: "center" },
+  weekCount: { color: colors.textMuted, fontSize: 12, flex: 1, marginLeft: 10 },
   section: { color: colors.textMuted, fontSize: 13, textTransform: "uppercase", letterSpacing: 1, marginTop: 8 },
   card: {
     flexDirection: "row",

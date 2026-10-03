@@ -26,6 +26,7 @@ import type { ChatMessage } from "../../lib/types";
 const QUICK_ACTIONS = [
   { label: "☀ Morning briefing", prompt: PRESET_PROMPTS.morning },
   { label: "☾ Evening check-in", prompt: PRESET_PROMPTS.evening },
+  { label: "▤ Weekly review", prompt: PRESET_PROMPTS.weekly },
   { label: "I'm procrastinating", prompt: "Jarvis, I'm procrastinating. Help me get moving." },
   { label: "New goal", prompt: "I want to set a new goal. Help me make it concrete." },
 ];

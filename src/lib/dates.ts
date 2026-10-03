@@ -49,3 +49,52 @@ export function isOverdue(goal: Goal): boolean {
 export function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+function daysBetween(fromKey: string, toKey: string): number {
+  const [fy, fm, fd] = fromKey.split("-").map(Number);
+  const [ty, tm, td] = toKey.split("-").map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+}
+
+/** Habit check-ins in the last 7 days, and how many were possible since the habit was created. */
+export function weekProgress(goal: Goal): { done: number; possible: number } {
+  const today = dateKey();
+  const since = daysBetween(dateKey(new Date(goal.createdAt)), today);
+  const possible = Math.max(1, Math.min(7, since + 1));
+  const done = goal.completions.filter((d) => {
+    const ago = daysBetween(d, today);
+    return ago >= 0 && ago < 7;
+  }).length;
+  return { done: Math.min(done, possible), possible };
+}
+
+export interface WeekSummary {
+  habitsDoneToday: number;
+  habitCount: number;
+  /** Share of possible habit check-ins done in the last 7 days, 0–100, or null with no habits. */
+  weekRate: number | null;
+  bestStreak: number;
+  tasksDoneThisWeek: number;
+}
+
+export function weekSummary(goals: Goal[]): WeekSummary {
+  const active = goals.filter((g) => !g.archived);
+  const habits = active.filter((g) => g.kind === "habit");
+  const today = dateKey();
+  let done = 0;
+  let possible = 0;
+  for (const h of habits) {
+    const w = weekProgress(h);
+    done += w.done;
+    possible += w.possible;
+  }
+  return {
+    habitsDoneToday: habits.filter(isDoneToday).length,
+    habitCount: habits.length,
+    weekRate: possible ? Math.round((done / possible) * 100) : null,
+    bestStreak: habits.reduce((best, h) => Math.max(best, streak(h)), 0),
+    tasksDoneThisWeek: goals.filter(
+      (g) => g.kind === "task" && g.completions.some((d) => daysBetween(d, today) < 7),
+    ).length,
+  };
+}

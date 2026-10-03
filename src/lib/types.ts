@@ -28,6 +28,8 @@ export interface Settings {
   voiceEnabled: boolean;
   morningReminder: { hour: number; minute: number } | null;
   eveningReminder: { hour: number; minute: number } | null;
+  /** Weekly review reminder; weekday 1 = Sunday … 7 = Saturday. */
+  weeklyReview: { weekday: number; hour: number; minute: number } | null;
   /** Listen for "Hey Jarvis" while the app is open (needs a Picovoice AccessKey). */
   wakeWordEnabled: boolean;
   /** How hard Jarvis pushes back. */
@@ -48,6 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceEnabled: false,
   morningReminder: { hour: 8, minute: 0 },
   eveningReminder: { hour: 21, minute: 0 },
+  weeklyReview: { weekday: 1, hour: 18, minute: 0 },
   wakeWordEnabled: false,
   tone: "balanced",
 };

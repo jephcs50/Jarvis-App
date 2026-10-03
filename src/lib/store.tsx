@@ -156,7 +156,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async (patch: Partial<Settings>) => {
       const settings = { ...stateRef.current.settings, ...patch };
       update((s) => ({ ...s, settings }));
-      if ("morningReminder" in patch || "eveningReminder" in patch || "userName" in patch) {
+      if ("morningReminder" in patch || "eveningReminder" in patch || "weeklyReview" in patch || "userName" in patch) {
         return scheduleCheckIns(settings).catch(() => false);
       }
       return true;

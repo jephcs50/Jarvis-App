@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { dateKey, isDoneToday, isOverdue, newId, streak } from "./dates";
+import { dateKey, isDoneToday, isOverdue, newId, streak, weekProgress } from "./dates";
 import type { AppState, Goal } from "./types";
 
 const MODEL = "claude-opus-5-5";
@@ -17,7 +17,7 @@ How you work:
 - When the user commits to something ("I'll run tomorrow", "I need to finish the report by Friday"), offer to track it, or just add it with add_goal if they clearly want that.
 - When they report doing something that matches a goal, call log_progress. Don't log progress they haven't claimed.
 - When you learn a durable fact worth remembering (their job, a deadline, what motivates them, a recurring obstacle), call remember.
-- Check-ins: in a morning briefing, help them pick today's priorities from their goals. In an evening check-in, ask what got done, log it, and for anything missed ask what got in the way and what they'll do differently. Be specific.
+- Check-ins: in a morning briefing, help them pick today's priorities from their goals. In an evening check-in, ask what got done, log it, and for anything missed ask what got in the way and what they'll do differently. In a weekly review, use the 7-day numbers: name what went well, the habit that slipped most and why, whether any goal should be adjusted or dropped, and one concrete focus for next week. Be specific.
 - Speak like a person, not a report. Short replies by default (1–4 sentences) unless they ask for depth. No markdown headers; light use of lists only when it truly helps. Your replies may be read aloud.
 - Address them by name occasionally if you know it. "Sir" or "ma'am" only if they ask for it.`;
 
@@ -90,11 +90,12 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
 ];
 
-export type TurnKind = "chat" | "morning" | "evening";
+export type TurnKind = "chat" | "morning" | "evening" | "weekly";
 
 export const PRESET_PROMPTS: Record<Exclude<TurnKind, "chat">, string> = {
   morning: "Morning, Jarvis. Give me my briefing for today.",
   evening: "Evening check-in, Jarvis. Let's go over how today went.",
+  weekly: "Jarvis, let's do my weekly review.",
 };
 
 export interface TurnResult {
@@ -109,7 +110,12 @@ export interface TurnResult {
 function describeGoal(g: Goal): string {
   const parts = [`[${g.id}] ${g.title} (${g.kind})`];
   if (g.kind === "habit") {
-    parts.push(`streak ${streak(g)}d`, isDoneToday(g) ? "done today" : "not yet today");
+    const week = weekProgress(g);
+    parts.push(
+      `streak ${streak(g)}d`,
+      `last 7 days ${week.done}/${week.possible}`,
+      isDoneToday(g) ? "done today" : "not yet today",
+    );
   } else {
     if (g.dueDate) parts.push(`due ${g.dueDate}`);
     parts.push(g.completions.length ? "completed" : isOverdue(g) ? "OVERDUE" : "open");

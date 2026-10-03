@@ -2,7 +2,7 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import type { Settings } from "./types";
 
-export type ReminderKind = "morning" | "evening";
+export type ReminderKind = "morning" | "evening" | "weekly";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,7 +30,7 @@ async function ensurePermission(): Promise<boolean> {
 export async function scheduleCheckIns(settings: Settings): Promise<boolean> {
   if (Platform.OS === "web") return false;
   await Notifications.cancelAllScheduledNotificationsAsync();
-  if (!settings.morningReminder && !settings.eveningReminder) return true;
+  if (!settings.morningReminder && !settings.eveningReminder && !settings.weeklyReview) return true;
   if (!(await ensurePermission())) return false;
 
   const name = settings.userName ? `, ${settings.userName}` : "";
@@ -57,6 +57,22 @@ export async function scheduleCheckIns(settings: Settings): Promise<boolean> {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: r.time.hour,
         minute: r.time.minute,
+        channelId: "checkins",
+      },
+    });
+  }
+  if (settings.weeklyReview) {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Weekly review",
+        body: "Ten minutes with Jarvis: what worked this week, what slipped, and next week's focus.",
+        data: { checkin: "weekly" },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday: settings.weeklyReview.weekday,
+        hour: settings.weeklyReview.hour,
+        minute: settings.weeklyReview.minute,
         channelId: "checkins",
       },
     });

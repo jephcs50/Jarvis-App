@@ -8,7 +8,10 @@ import { isWakeWordAvailable } from "../../lib/wakeWord";
 
 type Time = Settings["morningReminder"];
 
-function formatTime(t: Time): string {
+const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const FULL_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function formatTime(t: { hour: number; minute: number } | null): string {
   return t ? `${String(t.hour).padStart(2, "0")}:${String(t.minute).padStart(2, "0")}` : "";
 }
 
@@ -34,7 +37,7 @@ function ReminderField({ label, value, onSave }: { label: string; value: Time; o
   const [text, setText] = useState(formatTime(value));
   return (
     <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
       <TextInput
         style={styles.timeInput}
         value={text}
@@ -208,7 +211,7 @@ export default function SettingsScreen() {
         </View>
       </Section>
 
-      <Section title="Daily check-ins">
+      <Section title="Check-ins">
         <ReminderField
           key={`m-${loaded}-${formatTime(settings.morningReminder)}`}
           label="Morning briefing"
@@ -221,10 +224,46 @@ export default function SettingsScreen() {
           value={settings.eveningReminder}
           onSave={(t) => saveReminders({ eveningReminder: t })}
         />
-        <Text style={styles.help}>Tapping a reminder opens Jarvis straight into the check-in.</Text>
-        <Pressable style={[styles.secondaryButton, { alignSelf: "flex-start" }]} onPress={() =>
-            saveReminders({ morningReminder: settings.morningReminder, eveningReminder: settings.eveningReminder })
-          }>
+        <ReminderField
+          key={`w-${loaded}-${formatTime(settings.weeklyReview)}`}
+          label="Weekly review"
+          value={settings.weeklyReview}
+          onSave={(t) =>
+            saveReminders({ weeklyReview: t ? { weekday: settings.weeklyReview?.weekday ?? 1, ...t } : null })
+          }
+        />
+        {settings.weeklyReview && (
+          <View style={styles.weekdays}>
+            {WEEKDAYS.map((label, i) => {
+              const weekday = i + 1;
+              const selected = settings.weeklyReview?.weekday === weekday;
+              return (
+                <Pressable
+                  key={weekday}
+                  style={[styles.weekday, selected && styles.segmentActive]}
+                  onPress={() => {
+                    const review = settings.weeklyReview;
+                    if (review) saveReminders({ weeklyReview: { ...review, weekday } });
+                  }}
+                  accessibilityLabel={`Weekly review on ${FULL_WEEKDAYS[i]}`}
+                >
+                  <Text style={[styles.segmentText, selected && { color: colors.bg }]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+        <Text style={styles.help}>Tapping a reminder opens Jarvis straight into the check-in. Leave a time blank to turn it off.</Text>
+        <Pressable
+          style={[styles.secondaryButton, { alignSelf: "flex-start" }]}
+          onPress={() =>
+            saveReminders({
+              morningReminder: settings.morningReminder,
+              eveningReminder: settings.eveningReminder,
+              weeklyReview: settings.weeklyReview,
+            })
+          }
+        >
           <Text style={{ color: colors.accent }}>Re-enable reminders</Text>
         </Pressable>
       </Section>
@@ -277,7 +316,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    minWidth: 80,
+    width: 90,
+    flexGrow: 0,
     textAlign: "center",
     fontSize: 16,
   },
@@ -290,6 +330,14 @@ const styles = StyleSheet.create({
   segmentItem: { flex: 1, paddingVertical: 8, alignItems: "center", borderRadius: radius.sm - 2 },
   segmentActive: { backgroundColor: colors.accent },
   segmentText: { color: colors.textMuted, fontWeight: "500" },
+  weekdays: { flexDirection: "row", justifyContent: "space-between", gap: 4 },
+  weekday: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: radius.sm,
+    backgroundColor: colors.bg,
+  },
   memory: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   memoryText: { color: colors.text, flex: 1, lineHeight: 20 },
 });

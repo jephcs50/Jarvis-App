@@ -6,6 +6,6 @@ export function useNotificationCheckin(): { id: string; kind: ReminderKind } | n
   const response = useLastNotificationResponse();
   const id = response?.notification.request.identifier;
   const kind = response?.notification.request.content.data?.checkin;
-  if (!id || (kind !== "morning" && kind !== "evening")) return null;
+  if (!id || (kind !== "morning" && kind !== "evening" && kind !== "weekly")) return null;
   return { id, kind };
 }

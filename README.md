@@ -11,8 +11,8 @@ A mobile app (iOS + Android, built with Expo / React Native) that you can talk t
   - Say "I'm going to start running every morning" and it offers to track it, or just adds it.
   - Say "did my run" and it logs it and updates your streak.
   - Miss something and it asks what got in the way, and how much it pushes is up to you (gentle / balanced / tough love).
-- **Daily check-ins.** A morning briefing and an evening review arrive as notifications (times set in Settings). Tapping one opens Jarvis straight into that check-in.
-- **Goals screen.** Daily habits with a 7-day history and 🔥 streaks, plus one-off commitments with due dates. Tap to check off, long-press to archive.
+- **Check-ins.** A morning briefing and an evening review arrive as notifications every day, plus a weekly review (Sunday 18:00 by default; you pick the day). Tapping one opens Jarvis straight into that check-in. In the weekly review Jarvis goes over the 7-day numbers: what went well, the habit that slipped most and why, whether to adjust a goal, and one focus for next week.
+- **Goals screen.** Today / this week / best-streak tiles at the top. Daily habits show a 7-day history, a this-week count and a 🔥 streak, plus one-off commitments with due dates. Tap to check off, long-press to archive.
 - **Memory.** Jarvis remembers durable facts about you (your job, what motivates you, recurring obstacles). You can see and delete them in Settings.
 
 ## Running it
@@ -44,6 +44,10 @@ npx eas-cli@latest build --platform android --profile preview
 ```
 
 The first run asks to create the EAS project and an Android signing key. Say yes to both. The build takes about 10–20 minutes. When it finishes, the CLI prints a link and a QR code. Open it on the tablet, download the APK, and allow "Install unknown apps" for your browser when Android asks. The `preview` build runs on its own, with no computer or dev server needed.
+
+### Try it in a browser
+
+`npx expo start --web` runs the app in a browser, which is handy for quick UI checks. Voice, wake word and notifications are phone-only, and keys are stored in browser storage (not encrypted) there.
 
 ### Checks
 
@@ -92,4 +96,4 @@ This app calls the Anthropic API **directly from the phone using your own key**,
 - A more natural voice using a neural text-to-speech API
 - Streaming replies (needs a fetch polyfill with streaming support on React Native)
 - A backend proxy plus accounts, so you can sync across devices
-- Weekly review summaries and charts
+- Longer-term progress history (monthly trends)
