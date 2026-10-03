@@ -17,7 +17,8 @@ import {
 } from "react-native";
 import { PRESET_PROMPTS } from "../../lib/jarvis";
 import { useStore } from "../../lib/store";
-import { useHandsFree } from "../../lib/voice";
+import { speakAsync, useHandsFree } from "../../lib/voice";
+import { useWakeWord } from "../../lib/wakeWord";
 import { VoicePanel } from "../../components/VoicePanel";
 import { colors, radius } from "../../lib/theme";
 import type { ChatMessage } from "../../lib/types";
@@ -42,11 +43,27 @@ function Bubble({ item }: { item: ChatMessage }) {
 }
 
 export default function ChatScreen() {
-  const { state, loaded, thinking, hasApiKey, send, newConversation } = useStore();
+  const { state, loaded, thinking, hasApiKey, picovoiceKeyVersion, send, newConversation } = useStore();
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const voice = useHandsFree((text) => send(text, { voice: true }));
   const handsFree = voice.status !== "off";
+
+  // "Hey Jarvis": the wake word listener hands the mic to a hands-free conversation,
+  // and picks up listening again once that conversation ends.
+  const [waking, setWaking] = useState(false);
+  const wakeWord = useWakeWord({
+    enabled: loaded && hasApiKey && state.settings.wakeWordEnabled,
+    paused: handsFree || waking,
+    keyVersion: picovoiceKeyVersion,
+    onWake: async () => {
+      setWaking(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      await speakAsync("Yes?");
+      await voice.start();
+      setWaking(false);
+    },
+  });
 
   const startHandsFree = () => {
     if (!hasApiKey) {
@@ -114,6 +131,29 @@ export default function ChatScreen() {
           </View>
         }
       />
+
+      {state.settings.wakeWordEnabled && !handsFree && (
+        <Pressable
+          style={styles.wakeRow}
+          onPress={() => wakeWord.status === "error" && router.navigate("/settings")}
+        >
+          <View
+            style={[
+              styles.wakeDot,
+              { backgroundColor: wakeWord.status === "listening" ? colors.success : wakeWord.status === "error" ? colors.danger : colors.border },
+            ]}
+          />
+          <Text style={styles.wakeText} numberOfLines={2}>
+            {wakeWord.status === "listening"
+              ? "Listening for “Hey Jarvis”"
+              : wakeWord.status === "error"
+                ? wakeWord.error
+                : waking
+                  ? "Waking up…"
+                  : "Wake word paused"}
+          </Text>
+        </Pressable>
+      )}
 
       {voice.notice && (
         <Pressable style={styles.notice} onPress={voice.dismissNotice}>
@@ -270,6 +310,9 @@ const styles = StyleSheet.create({
   },
   sendText: { color: colors.bg, fontSize: 22, fontWeight: "700" },
   micText: { fontSize: 20 },
+  wakeRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingTop: 6, paddingHorizontal: 16 },
+  wakeDot: { width: 8, height: 8, borderRadius: 4 },
+  wakeText: { color: colors.textMuted, fontSize: 12, flexShrink: 1 },
   notice: { backgroundColor: colors.surfaceRaised, paddingVertical: 8, paddingHorizontal: 14 },
   noticeText: { color: colors.gold, fontSize: 13, textAlign: "center" },
 });

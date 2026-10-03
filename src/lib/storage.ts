@@ -4,6 +4,7 @@ import { EMPTY_STATE, type AppState } from "./types";
 
 const STATE_KEY = "jarvis.state.v1";
 const API_KEY_KEY = "jarvis.anthropicApiKey";
+const PICOVOICE_KEY_KEY = "jarvis.picovoiceAccessKey";
 
 export async function loadState(): Promise<AppState> {
   try {
@@ -33,5 +34,17 @@ export async function setApiKey(key: string): Promise<void> {
     await SecureStore.setItemAsync(API_KEY_KEY, key.trim());
   } else {
     await SecureStore.deleteItemAsync(API_KEY_KEY);
+  }
+}
+
+export async function getPicovoiceKey(): Promise<string | null> {
+  return SecureStore.getItemAsync(PICOVOICE_KEY_KEY);
+}
+
+export async function setPicovoiceKey(key: string): Promise<void> {
+  if (key.trim()) {
+    await SecureStore.setItemAsync(PICOVOICE_KEY_KEY, key.trim());
+  } else {
+    await SecureStore.deleteItemAsync(PICOVOICE_KEY_KEY);
   }
 }

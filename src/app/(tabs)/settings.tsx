@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 import { useStore } from "../../lib/store";
 import { colors, radius } from "../../lib/theme";
 import type { Settings } from "../../lib/types";
+import { isWakeWordAvailable } from "../../lib/wakeWord";
 
 type Time = Settings["morningReminder"];
 
@@ -56,9 +57,11 @@ function ReminderField({ label, value, onSave }: { label: string; value: Time; o
 }
 
 export default function SettingsScreen() {
-  const { state, loaded, hasApiKey, saveApiKey, updateSettings, forgetMemory } = useStore();
+  const { state, loaded, hasApiKey, hasPicovoiceKey, saveApiKey, savePicovoiceKey, updateSettings, forgetMemory } =
+    useStore();
   const { settings } = state;
   const [keyDraft, setKeyDraft] = useState("");
+  const [picovoiceDraft, setPicovoiceDraft] = useState("");
   const [name, setName] = useState<string | null>(null);
 
   const saveReminders = async (patch: Partial<Settings>) => {
@@ -146,6 +149,63 @@ export default function SettingsScreen() {
           Typed messages are read aloud when this is on. For a fully hands-free conversation, tap the 🎙 button in the chat:
           Jarvis listens, replies out loud, then listens again. Say “that’s all” or tap End to finish.
         </Text>
+      </Section>
+
+      <Section title="“Hey Jarvis” wake word">
+        <View style={styles.row}>
+          <Text style={styles.label}>Listen for “Hey Jarvis”</Text>
+          <Switch
+            value={settings.wakeWordEnabled}
+            disabled={!hasPicovoiceKey && !settings.wakeWordEnabled}
+            onValueChange={(v) => {
+              updateSettings({ wakeWordEnabled: v });
+            }}
+            trackColor={{ true: colors.accent, false: colors.border }}
+          />
+        </View>
+        <Text style={styles.help}>
+          While Jarvis is open on screen, say “Hey Jarvis” to start a hands-free conversation. Detection runs entirely on
+          your phone. No audio leaves the device until Jarvis wakes up. It pauses when the app is in the background.
+          {isWakeWordAvailable() ? "" : "\n\nRequires a development build of the app (not Expo Go)."}
+        </Text>
+        <Text style={styles.help}>
+          {hasPicovoiceKey
+            ? "✓ Picovoice AccessKey saved."
+            : "The wake word engine needs a free Picovoice AccessKey from console.picovoice.ai."}
+        </Text>
+        <TextInput
+          style={styles.input}
+          value={picovoiceDraft}
+          onChangeText={setPicovoiceDraft}
+          placeholder={hasPicovoiceKey ? "Paste a new AccessKey to replace" : "Picovoice AccessKey"}
+          placeholderTextColor={colors.textMuted}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <View style={styles.buttonRow}>
+          {hasPicovoiceKey && (
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={async () => {
+                await savePicovoiceKey("");
+                updateSettings({ wakeWordEnabled: false });
+              }}
+            >
+              <Text style={styles.danger}>Remove</Text>
+            </Pressable>
+          )}
+          <Pressable
+            style={[styles.primaryButton, !picovoiceDraft.trim() && { opacity: 0.4 }]}
+            disabled={!picovoiceDraft.trim()}
+            onPress={async () => {
+              await savePicovoiceKey(picovoiceDraft);
+              setPicovoiceDraft("");
+            }}
+          >
+            <Text style={styles.primaryText}>Save AccessKey</Text>
+          </Pressable>
+        </View>
       </Section>
 
       <Section title="Daily check-ins">

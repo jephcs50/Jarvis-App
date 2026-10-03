@@ -35,6 +35,20 @@ export function isHandsFreeAvailable(): boolean {
   }
 }
 
+/** Asks for microphone access (used by the wake-word listener). */
+export async function requestMicrophone(): Promise<boolean> {
+  if (!recognizer) return false;
+  const permission = await recognizer.requestMicrophonePermissionsAsync();
+  return permission.granted;
+}
+
+/** Speaks text and resolves when speech finishes (or is interrupted). */
+export function speakAsync(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    Speech.speak(text, { ...JARVIS_VOICE, onDone: resolve, onStopped: resolve, onError: () => resolve() });
+  });
+}
+
 /**
  * Hands-free conversation loop: listen → send what was heard → speak the reply → listen again.
  * `send` returns Jarvis's reply text, or null if the turn failed.
@@ -84,21 +98,23 @@ export function useHandsFree(send: (text: string) => Promise<string | null>) {
     Speech.stop();
   }, []);
 
-  const start = useCallback(async () => {
+  /** Starts a hands-free conversation. Resolves false if it couldn't (no recognizer or permission). */
+  const start = useCallback(async (): Promise<boolean> => {
     if (!recognizer || !isHandsFreeAvailable()) {
       setNotice("Speech recognition isn't available here. Hands-free mode needs a development build of the app.");
-      return;
+      return false;
     }
     const permission = await recognizer.requestPermissionsAsync();
     if (!permission.granted) {
       setNotice("Jarvis needs microphone and speech recognition access for hands-free mode.");
-      return;
+      return false;
     }
     Speech.stop();
     active.current = true;
     silentListens.current = 0;
     setNotice(null);
     listen();
+    return true;
   }, [listen]);
 
   const handleHeard = useCallback(

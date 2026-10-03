@@ -4,7 +4,14 @@ import { dateKey, newId } from "./dates";
 import { describeError, runJarvisTurn } from "./jarvis";
 import { scheduleCheckIns } from "./notifications";
 import { JARVIS_VOICE } from "./voice";
-import { getApiKey, loadState, saveState, setApiKey as persistApiKey } from "./storage";
+import {
+  getApiKey,
+  getPicovoiceKey,
+  loadState,
+  saveState,
+  setApiKey as persistApiKey,
+  setPicovoiceKey as persistPicovoiceKey,
+} from "./storage";
 import { EMPTY_STATE, type AppState, type ChatMessage, type Goal, type GoalKind, type Settings } from "./types";
 
 interface Store {
@@ -12,6 +19,9 @@ interface Store {
   loaded: boolean;
   thinking: boolean;
   hasApiKey: boolean;
+  hasPicovoiceKey: boolean;
+  /** Bumps whenever the Picovoice key changes, so the wake-word engine can re-initialize. */
+  picovoiceKeyVersion: number;
   /** Sends a message to Jarvis and resolves with the reply, or null if nothing was sent or it failed. */
   send: (text: string, options?: SendOptions) => Promise<string | null>;
   addGoal: (title: string, kind: GoalKind, why: string | null, dueDate: string | null) => void;
@@ -19,6 +29,7 @@ interface Store {
   archiveGoal: (goalId: string) => void;
   updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
   saveApiKey: (key: string) => Promise<void>;
+  savePicovoiceKey: (key: string) => Promise<void>;
   forgetMemory: (index: number) => void;
   newConversation: () => void;
 }
@@ -39,14 +50,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [hasPicovoiceKey, setHasPicovoiceKey] = useState(false);
+  const [picovoiceKeyVersion, setPicovoiceKeyVersion] = useState(0);
   // Latest state for async callbacks, so a Jarvis turn sees edits made while it was loading.
   const stateRef = useRef(state);
   stateRef.current = state;
 
   useEffect(() => {
-    Promise.all([loadState(), getApiKey()]).then(([s, key]) => {
+    Promise.all([loadState(), getApiKey(), getPicovoiceKey()]).then(([s, key, picovoiceKey]) => {
       setState(s);
       setHasApiKey(Boolean(key));
+      setHasPicovoiceKey(Boolean(picovoiceKey));
       setLoaded(true);
       scheduleCheckIns(s.settings).catch(() => {});
     });
@@ -155,6 +169,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setHasApiKey(Boolean(key.trim()));
   }, []);
 
+  const savePicovoiceKey = useCallback(async (key: string) => {
+    await persistPicovoiceKey(key);
+    setHasPicovoiceKey(Boolean(key.trim()));
+    setPicovoiceKeyVersion((v) => v + 1);
+  }, []);
+
   const forgetMemory = useCallback(
     (index: number) => update((s) => ({ ...s, memories: s.memories.filter((_, i) => i !== index) })),
     [update],
@@ -172,12 +192,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         loaded,
         thinking,
         hasApiKey,
+        hasPicovoiceKey,
+        picovoiceKeyVersion,
         send,
         addGoal,
         toggleToday,
         archiveGoal,
         updateSettings,
         saveApiKey,
+        savePicovoiceKey,
         forgetMemory,
         newConversation,
       }}

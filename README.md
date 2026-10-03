@@ -6,6 +6,7 @@ A mobile app (iOS + Android, built with Expo / React Native) that you can talk t
 
 - **Conversations.** Chat with Jarvis about anything. It's powered by Claude (`claude-opus-5-5`), with a composed, dry-witted Jarvis personality. Turn on **voice** in Settings and typed replies are read aloud in a British voice.
 - **Hands-free voice.** Tap 🎙 in the chat (it shows when the text box is empty) and just talk. Jarvis listens, replies out loud, then listens again, so you can hold a whole conversation with the phone in your pocket. Say "that's all" or "goodbye" (or tap **End**) to finish. It switches itself off after a few silent listens, and whenever the app goes to the background. In voice mode Jarvis keeps its replies short and spoken-style.
+- **"Hey Jarvis" wake word.** Turn it on in Settings, and while the app is open (e.g. on a desk or stand), say "Hey Jarvis". It answers "Yes?" and drops you straight into a hands-free conversation, then goes back to listening for its name once you're done. Detection uses [Picovoice Porcupine](https://picovoice.ai/platform/porcupine/) and runs entirely on the phone. No audio leaves the device until Jarvis wakes up. A small indicator in the chat shows when it's listening.
 - **Accountability.** Jarvis sees your goals, streaks and overdue tasks on every message, and acts on them:
   - Say "I'm going to start running every morning" and it offers to track it, or just adds it.
   - Say "did my run" and it logs it and updates your streak.
@@ -25,7 +26,9 @@ Then scan the QR code with a development build on your phone (see the note below
 
 On first launch, open **Settings** and paste an Anthropic API key from [console.anthropic.com](https://console.anthropic.com). It's stored in the device's secure keychain (`expo-secure-store`).
 
-> **Development build:** the app uses native modules (notifications, secure store, speech). Hands-free voice (`expo-speech-recognition`) and scheduled notifications need a development build. The rest of the app still runs in Expo Go, where the mic button explains that it's unavailable.
+For the wake word, also paste a free Picovoice AccessKey from [console.picovoice.ai](https://console.picovoice.ai), then switch on **Listen for "Hey Jarvis"**.
+
+> **Development build:** the app uses native modules (notifications, secure store, speech). Hands-free voice (`expo-speech-recognition`), the wake word (Porcupine) and scheduled notifications need a development build. The rest of the app still runs in Expo Go, where these features explain that they're unavailable.
 > Build one with `npx expo run:android` / `npx expo run:ios`, or `npx eas-cli@latest build --profile development`.
 
 ### Checks
@@ -50,6 +53,7 @@ src/
     jarvis.ts           The brain: system prompt, tools, Claude tool-use loop
     store.tsx           App state (React context), persisted to AsyncStorage
     voice.ts            Hands-free loop: listen → send → speak → listen again
+    wakeWord.ts         On-device "Jarvis" detection; hands the mic to voice.ts
     notifications.ts    Daily morning/evening check-in scheduling
     dates.ts            Streaks and date helpers
     storage.ts          AsyncStorage + SecureStore
@@ -69,7 +73,8 @@ This app calls the Anthropic API **directly from the phone using your own key**,
 
 ## Ideas for next steps
 
-- An always-on "Hey Jarvis" wake word (needs a background audio service and a wake-word engine such as Picovoice Porcupine)
+- Wake word in the background or with the screen locked (Android foreground service; iOS background-audio mode, which App Store review scrutinizes)
+- A custom-trained "Hey Jarvis" model (`.ppn` from the Picovoice console plus a config plugin to bundle it). The built-in "Jarvis" keyword already triggers on "Hey Jarvis"
 - A more natural voice using a neural text-to-speech API
 - Streaming replies (needs a fetch polyfill with streaming support on React Native)
 - A backend proxy plus accounts, so you can sync across devices
