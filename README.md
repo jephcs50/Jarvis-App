@@ -31,6 +31,20 @@ For the wake word, also paste a free Picovoice AccessKey from [console.picovoice
 > **Development build:** the app uses native modules (notifications, secure store, speech). Hands-free voice (`expo-speech-recognition`), the wake word (Porcupine) and scheduled notifications need a development build. The rest of the app still runs in Expo Go, where these features explain that they're unavailable.
 > Build one with `npx expo run:android` / `npx expo run:ios`, or `npx eas-cli@latest build --profile development`.
 
+### Install on an Android phone or tablet (no Android Studio)
+
+Expo's cloud build service (EAS) builds a standalone APK you can install directly. It needs a free account at [expo.dev](https://expo.dev). Run these on any computer with Node.js:
+
+```bash
+git clone -b ccr-7a25f5c9-g4bq92 https://github.com/jephcs50/Jarvis-App.git
+cd Jarvis-App
+npm install
+npx eas-cli@latest login
+npx eas-cli@latest build --platform android --profile preview
+```
+
+The first run asks to create the EAS project and an Android signing key. Say yes to both. The build takes about 10–20 minutes. When it finishes, the CLI prints a link and a QR code. Open it on the tablet, download the APK, and allow "Install unknown apps" for your browser when Android asks. The `preview` build runs on its own, with no computer or dev server needed.
+
 ### Checks
 
 ```bash
