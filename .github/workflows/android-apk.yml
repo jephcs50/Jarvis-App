@@ -1,0 +1,71 @@
+name: Android APK
+
+# Builds an installable APK on GitHub's runners (they ship with the Android SDK) and attaches it
+# to a GitHub Release, so it can be downloaded straight onto a phone.
+on:
+  push:
+    branches: [main, ccr-7a25f5c9-g4bq92]
+    paths-ignore: ["server/**", "**/*.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: android
+        # Expo's template signs release builds with the debug keystore: fine for sideloading/testing.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+      - name: Name the APK
+        id: apk
+        run: |
+          name="Jarvis-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$name"
+          echo "path=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-apk
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Publish as a GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="apk-${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" "${{ steps.apk.outputs.path }}" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Jarvis test build ${GITHUB_RUN_NUMBER}" \
+            --notes "Test APK built from ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}. Download the .apk below on your Android device and allow installing from your browser when asked."
