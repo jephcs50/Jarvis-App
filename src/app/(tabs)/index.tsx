@@ -1,5 +1,4 @@
 import * as Haptics from "expo-haptics";
-import { useLastNotificationResponse } from "expo-notifications";
 import { router } from "expo-router";
 import * as Speech from "expo-speech";
 import { useEffect, useRef, useState } from "react";
@@ -17,6 +16,7 @@ import {
 } from "react-native";
 import { PRESET_PROMPTS } from "../../lib/jarvis";
 import { useStore } from "../../lib/store";
+import { useNotificationCheckin } from "../../lib/useNotificationCheckin";
 import { speakAsync, useHandsFree } from "../../lib/voice";
 import { useWakeWord } from "../../lib/wakeWord";
 import { VoicePanel } from "../../components/VoicePanel";
@@ -75,15 +75,13 @@ export default function ChatScreen() {
   };
 
   // Tapping a morning/evening reminder opens the app straight into that check-in.
-  const response = useLastNotificationResponse();
+  const checkin = useNotificationCheckin();
   const handledNotification = useRef<string | null>(null);
   useEffect(() => {
-    const id = response?.notification.request.identifier;
-    const kind = response?.notification.request.content.data?.checkin;
-    if (!loaded || !id || handledNotification.current === id) return;
-    handledNotification.current = id;
-    if (kind === "morning" || kind === "evening") send(PRESET_PROMPTS[kind]);
-  }, [response, loaded, send]);
+    if (!loaded || !checkin || handledNotification.current === checkin.id) return;
+    handledNotification.current = checkin.id;
+    send(PRESET_PROMPTS[checkin.kind]);
+  }, [checkin, loaded, send]);
 
   const submit = (text: string) => {
     if (!text.trim() || thinking) return;
