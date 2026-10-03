@@ -1,14 +1,16 @@
 import * as Speech from "expo-speech";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { dateKey, newId } from "./dates";
-import { describeError, runJarvisTurn } from "./jarvis";
+import { describeError, runJarvisTurn, type Credentials } from "./jarvis";
 import { scheduleCheckIns } from "./notifications";
 import { JARVIS_VOICE } from "./voice";
 import {
+  getAccessCode,
   getApiKey,
   getPicovoiceKey,
   loadState,
   saveState,
+  setAccessCode as persistAccessCode,
   setApiKey as persistApiKey,
   setPicovoiceKey as persistPicovoiceKey,
 } from "./storage";
@@ -19,6 +21,9 @@ interface Store {
   loaded: boolean;
   thinking: boolean;
   hasApiKey: boolean;
+  hasAccessCode: boolean;
+  /** Whether Jarvis has what it needs to reach Claude with the current connection setting. */
+  connected: boolean;
   hasPicovoiceKey: boolean;
   /** Bumps whenever the Picovoice key changes, so the wake-word engine can re-initialize. */
   picovoiceKeyVersion: number;
@@ -29,6 +34,7 @@ interface Store {
   archiveGoal: (goalId: string) => void;
   updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
   saveApiKey: (key: string) => Promise<void>;
+  saveAccessCode: (code: string) => Promise<void>;
   savePicovoiceKey: (key: string) => Promise<void>;
   forgetMemory: (index: number) => void;
   newConversation: () => void;
@@ -37,6 +43,15 @@ interface Store {
 export interface SendOptions {
   /** Hands-free voice turn: Jarvis keeps it short, and the caller handles speaking the reply. */
   voice?: boolean;
+}
+
+async function credentialsFor(settings: Settings): Promise<Credentials | null> {
+  if (settings.connection === "server") {
+    const code = await getAccessCode();
+    return code && settings.serverUrl ? { apiKey: code, baseURL: settings.serverUrl.replace(/\/+$/, "") } : null;
+  }
+  const key = await getApiKey();
+  return key ? { apiKey: key } : null;
 }
 
 const StoreContext = createContext<Store | null>(null);
@@ -50,6 +65,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [hasAccessCode, setHasAccessCode] = useState(false);
   const [hasPicovoiceKey, setHasPicovoiceKey] = useState(false);
   const [picovoiceKeyVersion, setPicovoiceKeyVersion] = useState(0);
   // Latest state for async callbacks, so a Jarvis turn sees edits made while it was loading.
@@ -57,9 +73,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
 
   useEffect(() => {
-    Promise.all([loadState(), getApiKey(), getPicovoiceKey()]).then(([s, key, picovoiceKey]) => {
+    Promise.all([loadState(), getApiKey(), getPicovoiceKey(), getAccessCode()]).then(([s, key, picovoiceKey, code]) => {
       setState(s);
       setHasApiKey(Boolean(key));
+      setHasAccessCode(Boolean(code));
       setHasPicovoiceKey(Boolean(picovoiceKey));
       setLoaded(true);
       scheduleCheckIns(s.settings).catch(() => {});
@@ -79,7 +96,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       update((s) => ({ ...s, chat: [...s.chat, message("user", trimmed)] }));
       setThinking(true);
       try {
-        const result = await runJarvisTurn(stateRef.current, trimmed, await getApiKey(), {
+        const result = await runJarvisTurn(stateRef.current, trimmed, await credentialsFor(stateRef.current.settings), {
           voice: options.voice ?? false,
         });
         update((s) => ({
@@ -169,6 +186,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setHasApiKey(Boolean(key.trim()));
   }, []);
 
+  const saveAccessCode = useCallback(async (code: string) => {
+    await persistAccessCode(code);
+    setHasAccessCode(Boolean(code.trim()));
+  }, []);
+
   const savePicovoiceKey = useCallback(async (key: string) => {
     await persistPicovoiceKey(key);
     setHasPicovoiceKey(Boolean(key.trim()));
@@ -192,6 +214,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         loaded,
         thinking,
         hasApiKey,
+        hasAccessCode,
+        connected:
+          state.settings.connection === "server" ? Boolean(state.settings.serverUrl) && hasAccessCode : hasApiKey,
         hasPicovoiceKey,
         picovoiceKeyVersion,
         send,
@@ -200,6 +225,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         archiveGoal,
         updateSettings,
         saveApiKey,
+        saveAccessCode,
         savePicovoiceKey,
         forgetMemory,
         newConversation,

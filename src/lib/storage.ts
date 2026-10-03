@@ -6,6 +6,7 @@ import { EMPTY_STATE, type AppState } from "./types";
 const STATE_KEY = "jarvis.state.v1";
 const API_KEY_KEY = "jarvis.anthropicApiKey";
 const PICOVOICE_KEY_KEY = "jarvis.picovoiceAccessKey";
+const ACCESS_CODE_KEY = "jarvis.serverAccessCode";
 
 export async function loadState(): Promise<AppState> {
   try {
@@ -57,5 +58,17 @@ export async function setPicovoiceKey(key: string): Promise<void> {
     await secret.set(PICOVOICE_KEY_KEY, key.trim());
   } else {
     await secret.remove(PICOVOICE_KEY_KEY);
+  }
+}
+
+export async function getAccessCode(): Promise<string | null> {
+  return secret.get(ACCESS_CODE_KEY);
+}
+
+export async function setAccessCode(code: string): Promise<void> {
+  if (code.trim()) {
+    await secret.set(ACCESS_CODE_KEY, code.trim());
+  } else {
+    await secret.remove(ACCESS_CODE_KEY);
   }
 }

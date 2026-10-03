@@ -1,0 +1,16 @@
+# Deploy the Jarvis server on Render: Dashboard → New → Blueprint → pick this repo.
+# You'll be asked for the two secret values below.
+services:
+  - type: web
+    name: jarvis-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: node src/index.ts
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ACCESS_CODES
+        sync: false

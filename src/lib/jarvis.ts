@@ -201,16 +201,42 @@ function runTool(
 
 export class MissingApiKeyError extends Error {}
 
+export interface Credentials {
+  /** An Anthropic API key, or a Jarvis server access code. */
+  apiKey: string;
+  /** Jarvis server URL; undefined means Anthropic directly. */
+  baseURL?: string;
+}
+
+/** Checks a Jarvis server URL and access code. Resolves to the name the code belongs to. */
+export async function checkServer(serverUrl: string, accessCode: string): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${serverUrl.replace(/\/+$/, "")}/auth/check`, { headers: { "x-api-key": accessCode } });
+  } catch {
+    throw new Error("Couldn't reach the server. Check the URL and your connection.");
+  }
+  if (res.status === 401) throw new Error("The server didn't accept that access code.");
+  if (!res.ok) throw new Error(`The server answered with an error (${res.status}).`);
+  const body = (await res.json()) as { name?: string };
+  return body.name ?? "unknown";
+}
+
 export async function runJarvisTurn(
   state: AppState,
   userText: string,
-  apiKey: string | null,
+  credentials: Credentials | null,
   options: { voice: boolean } = { voice: false },
 ): Promise<TurnResult> {
-  if (!apiKey) throw new MissingApiKeyError("Add your Anthropic API key in Settings first.");
+  if (!credentials) throw new MissingApiKeyError("Connect Jarvis in Settings first.");
 
-  // The app talks to the API directly from the phone with the user's own key.
-  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  // Through a Jarvis server, the access code goes in the API-key slot and the server swaps in the
+  // real key. Without one, the app calls Anthropic directly with the user's own key.
+  const client = new Anthropic({
+    apiKey: credentials.apiKey,
+    baseURL: credentials.baseURL,
+    dangerouslyAllowBrowser: true,
+  });
 
   // Work on copies; the caller commits the result only if the whole turn succeeds.
   const goals = state.goals.map((g) => ({ ...g, completions: [...g.completions] }));
@@ -281,7 +307,7 @@ export async function runJarvisTurn(
 export function describeError(error: unknown): string {
   if (error instanceof MissingApiKeyError) return error.message;
   if (error instanceof Anthropic.AuthenticationError) {
-    return "That API key was rejected. Check it in Settings.";
+    return "That API key or access code was rejected. Check it in Settings.";
   }
   if (error instanceof Anthropic.RateLimitError) {
     return "I'm being rate limited. Give me a moment and try again.";

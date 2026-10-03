@@ -44,7 +44,7 @@ function Bubble({ item }: { item: ChatMessage }) {
 }
 
 export default function ChatScreen() {
-  const { state, loaded, thinking, hasApiKey, picovoiceKeyVersion, send, newConversation } = useStore();
+  const { state, loaded, thinking, connected, picovoiceKeyVersion, send, newConversation } = useStore();
   const [draft, setDraft] = useState("");
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const voice = useHandsFree((text) => send(text, { voice: true }));
@@ -54,7 +54,7 @@ export default function ChatScreen() {
   // and picks up listening again once that conversation ends.
   const [waking, setWaking] = useState(false);
   const wakeWord = useWakeWord({
-    enabled: loaded && hasApiKey && state.settings.wakeWordEnabled,
+    enabled: loaded && connected && state.settings.wakeWordEnabled,
     paused: handsFree || waking,
     keyVersion: picovoiceKeyVersion,
     onWake: async () => {
@@ -67,7 +67,7 @@ export default function ChatScreen() {
   });
 
   const startHandsFree = () => {
-    if (!hasApiKey) {
+    if (!connected) {
       router.navigate("/settings");
       return;
     }
@@ -99,9 +99,9 @@ export default function ChatScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      {!hasApiKey && loaded && (
+      {!connected && loaded && (
         <Pressable style={styles.banner} onPress={() => router.navigate("/settings")}>
-          <Text style={styles.bannerText}>Add your Anthropic API key in Settings to wake Jarvis up →</Text>
+          <Text style={styles.bannerText}>Connect Jarvis in Settings to wake it up →</Text>
         </Pressable>
       )}
 

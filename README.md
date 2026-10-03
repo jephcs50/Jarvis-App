@@ -24,7 +24,7 @@ npx expo start
 
 Then scan the QR code with a development build on your phone (see the note below), or press `a` / `i` for an emulator.
 
-On first launch, open **Settings** and paste an Anthropic API key from [console.anthropic.com](https://console.anthropic.com). It's stored in the device's secure keychain (`expo-secure-store`).
+On first launch, open **Settings → Connection** and either enter your Jarvis server URL and access code, or paste an Anthropic API key from [console.anthropic.com](https://console.anthropic.com). Either one is stored in the device's secure keychain (`expo-secure-store`). See [Connecting to Claude](#connecting-to-claude-server-or-own-key).
 
 For the wake word, also paste a free Picovoice AccessKey from [console.picovoice.ai](https://console.picovoice.ai), then switch on **Listen for "Hey Jarvis"**.
 
@@ -75,6 +75,7 @@ src/
     notifications.ts    Daily morning/evening check-in scheduling
     dates.ts            Streaks and date helpers
     storage.ts          AsyncStorage + SecureStore
+server/                 Optional proxy that holds the Anthropic API key (see server/README.md)
 ```
 
 **The Claude integration** (`src/lib/jarvis.ts`):
@@ -85,9 +86,22 @@ src/
 - **Refusal fallbacks** (`fallbacks: "default"`) are on. If a safety classifier declines a message, the API re-runs it on Anthropic's recommended fallback model instead of failing.
 - Effort is set to `low` so replies come back quickly on a phone. Raise it in `jarvis.ts` if you want more deliberate answers.
 
-## Important: API key security
+## Connecting to Claude: server or own key
 
-This app calls the Anthropic API **directly from the phone using your own key**, which is fine for a personal app on your own device. **Don't ship it to other people this way:** anyone with the app could pull the key out. To distribute it, put a small backend between the app and the API that holds the key, and point the client at it (`new Anthropic({ baseURL, ... })`).
+In **Settings → Connection** pick one:
+
+- **Jarvis server (recommended, and required to share the app).** Your Anthropic key lives on a small server you deploy ([`server/`](server/README.md), free on Render). Each person gets their own access code, with per-person limits, and you can revoke a code at any time. The phone never sees the real key. Tap **Test connection** to check the URL and code.
+- **Own API key.** The phone calls Anthropic directly with a key stored in its secure keychain. Fine for your own device, but don't distribute a build this way: anyone with the app could extract the key.
+
+To bake your server URL into the build so people only need an access code, add it to the build profile in `eas.json`:
+
+```json
+"preview": {
+  "distribution": "internal",
+  "env": { "EXPO_PUBLIC_JARVIS_SERVER_URL": "https://your-jarvis-server.onrender.com" },
+  "android": { "buildType": "apk" }
+}
+```
 
 ## Ideas for next steps
 
@@ -95,5 +109,5 @@ This app calls the Anthropic API **directly from the phone using your own key**,
 - A custom-trained "Hey Jarvis" model (`.ppn` from the Picovoice console plus a config plugin to bundle it). The built-in "Jarvis" keyword already triggers on "Hey Jarvis"
 - A more natural voice using a neural text-to-speech API
 - Streaming replies (needs a fetch polyfill with streaming support on React Native)
-- A backend proxy plus accounts, so you can sync across devices
+- Accounts and cloud sync of goals across devices (the server is a natural home for it)
 - Longer-term progress history (monthly trends)

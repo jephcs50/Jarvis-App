@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { DEFAULT_SERVER_URL } from "./config";
 
 export type GoalKind = "habit" | "task";
 
@@ -24,6 +25,9 @@ export interface ChatMessage {
 }
 
 export interface Settings {
+  /** "server": requests go through a Jarvis server holding the API key; "apiKey": straight to Anthropic. */
+  connection: "server" | "apiKey";
+  serverUrl: string;
   userName: string;
   voiceEnabled: boolean;
   morningReminder: { hour: number; minute: number } | null;
@@ -46,6 +50,8 @@ export interface AppState {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  connection: DEFAULT_SERVER_URL ? "server" : "apiKey",
+  serverUrl: DEFAULT_SERVER_URL,
   userName: "",
   voiceEnabled: false,
   morningReminder: { hour: 8, minute: 0 },

@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useStore } from "../../lib/store";
 import { colors, radius } from "../../lib/theme";
+import { checkServer } from "../../lib/jarvis";
+import { getAccessCode } from "../../lib/storage";
 import type { Settings } from "../../lib/types";
 import { isWakeWordAvailable } from "../../lib/wakeWord";
 
@@ -45,7 +47,7 @@ function ReminderField({ label, value, onSave }: { label: string; value: Time; o
         placeholder="off"
         placeholderTextColor={colors.textMuted}
         keyboardType="numbers-and-punctuation"
-        onEndEditing={() => {
+        onBlur={() => {
           const parsed = parseTime(text);
           if (parsed === undefined) {
             Alert.alert("Invalid time", "Use 24-hour HH:MM, e.g. 07:30. Leave blank to turn off.");
@@ -59,11 +61,156 @@ function ReminderField({ label, value, onSave }: { label: string; value: Time; o
   );
 }
 
+function SecretField({
+  saved,
+  savedText,
+  emptyText,
+  placeholder,
+  buttonLabel,
+  onSave,
+}: {
+  saved: boolean;
+  savedText: string;
+  emptyText: string;
+  placeholder: string;
+  buttonLabel: string;
+  onSave: (value: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState("");
+  return (
+    <>
+      <Text style={styles.help}>{saved ? `✓ ${savedText}` : emptyText}</Text>
+      <TextInput
+        style={styles.input}
+        value={draft}
+        onChangeText={setDraft}
+        placeholder={saved ? "Paste a new one to replace" : placeholder}
+        placeholderTextColor={colors.textMuted}
+        secureTextEntry
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <View style={styles.buttonRow}>
+        {saved && (
+          <Pressable style={styles.secondaryButton} onPress={() => onSave("")}>
+            <Text style={styles.danger}>Remove</Text>
+          </Pressable>
+        )}
+        <Pressable
+          style={[styles.primaryButton, !draft.trim() && { opacity: 0.4 }]}
+          disabled={!draft.trim()}
+          onPress={async () => {
+            await onSave(draft);
+            setDraft("");
+          }}
+        >
+          <Text style={styles.primaryText}>{buttonLabel}</Text>
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
+function ConnectionSection() {
+  const { state, hasApiKey, hasAccessCode, saveApiKey, saveAccessCode, updateSettings } = useStore();
+  const { connection, serverUrl } = state.settings;
+  const [url, setUrl] = useState<string | null>(null);
+  const [check, setCheck] = useState<{ ok: boolean; text: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const testConnection = async () => {
+    const code = await getAccessCode();
+    if (!serverUrl || !code) {
+      setCheck({ ok: false, text: "Add the server URL and your access code first." });
+      return;
+    }
+    setChecking(true);
+    try {
+      const name = await checkServer(serverUrl, code);
+      setCheck({ ok: true, text: `Connected as ${name}.` });
+    } catch (e) {
+      setCheck({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <Section title="Connection">
+      <View style={styles.segment}>
+        {(
+          [
+            ["server", "Jarvis server"],
+            ["apiKey", "Own API key"],
+          ] as const
+        ).map(([value, label]) => (
+          <Pressable
+            key={value}
+            style={[styles.segmentItem, connection === value && styles.segmentActive]}
+            onPress={() => {
+              setCheck(null);
+              updateSettings({ connection: value });
+            }}
+          >
+            <Text style={[styles.segmentText, connection === value && { color: colors.bg }]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      {connection === "server" ? (
+        <>
+          <Text style={styles.help}>
+            Your Anthropic key stays on your Jarvis server. This phone only holds an access code, which you can revoke on
+            the server at any time.
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={url ?? serverUrl}
+            onChangeText={setUrl}
+            onBlur={() => {
+              if (url === null) return;
+              setCheck(null);
+              updateSettings({ serverUrl: url.trim().replace(/\/+$/, "") });
+            }}
+            placeholder="https://your-jarvis-server.onrender.com"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+          />
+          <SecretField
+            saved={hasAccessCode}
+            savedText="Access code saved securely on this device."
+            emptyText="Paste the access code from your server's ACCESS_CODES."
+            placeholder="Access code"
+            buttonLabel="Save code"
+            onSave={async (code) => {
+              setCheck(null);
+              await saveAccessCode(code);
+            }}
+          />
+          <Pressable style={[styles.secondaryButton, { alignSelf: "flex-start" }]} onPress={testConnection} disabled={checking}>
+            <Text style={{ color: colors.accent }}>{checking ? "Testing…" : "Test connection"}</Text>
+          </Pressable>
+          {check && <Text style={[styles.help, { color: check.ok ? colors.success : colors.danger }]}>{check.text}</Text>}
+        </>
+      ) : (
+        <SecretField
+          saved={hasApiKey}
+          savedText="Key saved securely on this device."
+          emptyText="Paste a key from console.anthropic.com. Fine for your own phone; use a Jarvis server to share the app."
+          placeholder="sk-ant-..."
+          buttonLabel="Save key"
+          onSave={saveApiKey}
+        />
+      )}
+    </Section>
+  );
+}
+
 export default function SettingsScreen() {
-  const { state, loaded, hasApiKey, hasPicovoiceKey, saveApiKey, savePicovoiceKey, updateSettings, forgetMemory } =
-    useStore();
+  const { state, loaded, hasPicovoiceKey, savePicovoiceKey, updateSettings, forgetMemory } = useStore();
   const { settings } = state;
-  const [keyDraft, setKeyDraft] = useState("");
   const [picovoiceDraft, setPicovoiceDraft] = useState("");
   const [name, setName] = useState<string | null>(null);
 
@@ -74,38 +221,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-      <Section title="Anthropic API key">
-        <Text style={styles.help}>
-          {hasApiKey ? "✓ Key saved securely on this device." : "Jarvis runs on Claude. Paste a key from console.anthropic.com."}
-        </Text>
-        <TextInput
-          style={styles.input}
-          value={keyDraft}
-          onChangeText={setKeyDraft}
-          placeholder={hasApiKey ? "Paste a new key to replace" : "sk-ant-..."}
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <View style={styles.buttonRow}>
-          {hasApiKey && (
-            <Pressable style={styles.secondaryButton} onPress={() => saveApiKey("")}>
-              <Text style={styles.danger}>Remove</Text>
-            </Pressable>
-          )}
-          <Pressable
-            style={[styles.primaryButton, !keyDraft.trim() && { opacity: 0.4 }]}
-            disabled={!keyDraft.trim()}
-            onPress={async () => {
-              await saveApiKey(keyDraft);
-              setKeyDraft("");
-            }}
-          >
-            <Text style={styles.primaryText}>Save key</Text>
-          </Pressable>
-        </View>
-      </Section>
+      <ConnectionSection />
 
       <Section title="About you">
         <View style={styles.row}>
@@ -114,7 +230,7 @@ export default function SettingsScreen() {
             style={styles.inlineInput}
             value={name ?? settings.userName}
             onChangeText={setName}
-            onEndEditing={() => name !== null && updateSettings({ userName: name.trim() })}
+            onBlur={() => name !== null && updateSettings({ userName: name.trim() })}
             placeholder="optional"
             placeholderTextColor={colors.textMuted}
           />
