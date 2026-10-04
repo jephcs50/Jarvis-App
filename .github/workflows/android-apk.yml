@@ -47,19 +47,31 @@ jobs:
         # Builds all four ABIs (ARM and x86) so it installs on any Android 7.0+ phone or tablet.
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Name the APK
+      - name: Sign with v1 + v2 + v3 and verify
         id: apk
+        # Gradle drops the older v1 (JAR) signature for minSdk 24+, and some installers (e.g. Xiaomi
+        # HyperOS) then reject the APK as "invalid package". Re-sign with apksigner, which adds v1 when
+        # told the APK must verify on older API levels, keeping the 16 KB-aligned native libraries.
         run: |
+          tools="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
           name="Jarvis-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.apk"
-          cp android/app/build/outputs/apk/release/app-release.apk "$name"
-          echo "path=$name" >> "$GITHUB_OUTPUT"
-
-      - name: Verify APK signature
-        run: |
-          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
-          "$apksigner" verify --verbose --min-sdk-version 24 "${{ steps.apk.outputs.path }}" | tee verify.txt
+          echo "Using $tools"
+          help="$("$tools/apksigner" sign --help 2>&1 || true)"
+          if grep -q -- "--alignment-preserved" <<<"$help"; then align=(--alignment-preserved)
+          elif grep -q -- "--lib-page-alignment" <<<"$help"; then align=(--lib-page-alignment 16384)
+          else align=(); fi
+          "$tools/apksigner" sign \
+            --ks android/app/debug.keystore --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --min-sdk-version 21 \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+            "${align[@]}" \
+            --out "$name" android/app/build/outputs/apk/release/app-release.apk
+          "$tools/apksigner" verify --verbose --min-sdk-version 21 "$name" | tee verify.txt
           grep -q "Verified using v1 scheme (JAR signing): true" verify.txt
           grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" verify.txt
+          "$tools/zipalign" -c -P 16 4 "$name" || echo "::warning::Native libraries are not 16 KB-aligned (only matters on 16 KB-page devices)"
+          echo "path=$name" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
