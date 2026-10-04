@@ -43,3 +43,4 @@ yarn-error.*
 # server secrets
 .env
 server/.env
+apk/
