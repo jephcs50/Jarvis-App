@@ -44,7 +44,8 @@ jobs:
       - name: Build release APK
         working-directory: android
         # Expo's template signs release builds with the debug keystore: fine for sideloading/testing.
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+        # Builds all four ABIs (ARM and x86) so it installs on any Android 7.0+ phone or tablet.
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Name the APK
         id: apk
@@ -52,6 +53,13 @@ jobs:
           name="Jarvis-${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$name"
           echo "path=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Verify APK signature
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --verbose --min-sdk-version 24 "${{ steps.apk.outputs.path }}" | tee verify.txt
+          grep -q "Verified using v1 scheme (JAR signing): true" verify.txt
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" verify.txt
 
       - uses: actions/upload-artifact@v4
         with:

@@ -41,7 +41,8 @@
             "com.google.android.googlequicksearchbox"
           ]
         }
-      ]
+      ],
+      "./plugins/withApkSigning"
     ],
     "scheme": "jarvis",
     "backgroundColor": "#070B12"
